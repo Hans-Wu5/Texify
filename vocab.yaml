@@ -1,0 +1,22 @@
+version: 1
+classes:
+  - name: alpha
+    token: "\\alpha"
+    aliases: ["alpha"]
+  - name: beta
+    token: "\\beta"
+    aliases: ["beta"]
+  - name: chi
+    token: "\\chi"
+    aliases: ["chi"]
+  - name: delta
+    token: "\\delta"
+    aliases: [ "delta" ]
+  - name: epsilon
+    token: "\\epsilon"
+    aliases: [ "epsilon" ]
+  - name: pi
+    token: "\\pi"
+    aliases: [ "pi" ]
+
+  # add more later...
