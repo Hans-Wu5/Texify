@@ -1,4 +1,5 @@
 # pip install -r requirements.txt
+import cv2
 import math
 import torch
 import numpy as np
@@ -9,10 +10,17 @@ import glob, json, argparse, yaml
 from PIL import Image, ImageOps, ImageFilter
 from pathlib import Path
 from typing import List, Dict
+from collections import Counter
 from torchvision import transforms
 from torchvision.models import resnet18
 from sklearn.metrics import classification_report, confusion_matrix
 from torch.utils.data import Dataset, DataLoader, WeightedRandomSampler
+from torchvision.models import ResNet18_Weights
+
+try:
+    RESAMPLE = Image.Resampling.BILINEAR
+except AttributeError:
+    RESAMPLE = Image.BILINEAR
 
 DEVICE = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
 
@@ -50,7 +58,6 @@ def parse_label_from_filename(stem: str) -> str:
 
 # -------------------------- Input image processing --------------------------
 
-
 def otsu_threshold(arr: np.ndarray) -> int:
     """Return an Otsu threshold (0..255) for uint8 grayscale array."""
     hist, _ = np.histogram(arr, bins=256, range=(0,256))
@@ -75,42 +82,43 @@ def otsu_threshold(arr: np.ndarray) -> int:
             thresh = t
     return thresh
 
-def preprocess_to_224_bw(pil: Image.Image, out_size: int = 224, percentile: int = 60):
-    """More robust: tries both percentile and Otsu, picks the cleaner mask."""
+
+def preprocess_to_224_bw(pil: Image.Image, out_size=224, save_debug_path=None):
+    from PIL import Image, ImageEnhance
+
+    # 1. Convert to grayscale
     g = pil.convert("L")
-    g = ImageOps.autocontrast(g)
-    g = g.filter(ImageFilter.MedianFilter(size=3))
 
-    arr = np.array(g, dtype=np.uint8)
+    # 2. Get center crop (224×224)
+    w, h = g.size
+    cx, cy = w // 2, h // 2
+    half = out_size // 2
 
-    # Variant A: percentile threshold
-    thr_p = np.percentile(arr, percentile)
-    bw_p = (arr < thr_p).astype(np.uint8) * 255
+    left = max(0, cx - half)
+    top = max(0, cy - half)
+    right = min(w, cx + half)
+    bottom = min(h, cy + half)
 
-    # Variant B: Otsu threshold
-    thr_o = otsu_threshold(arr)
-    bw_o = (arr < thr_o).astype(np.uint8) * 255
+    crop = g.crop((left, top, right, bottom))
 
-    # For each, consider also inverted (handles light-on-dark or glare)
-    cand = []
-    for m in (bw_p, 255 - bw_p, bw_o, 255 - bw_o):
-        im = Image.fromarray(m).convert("L")
-        bbox = im.getbbox()
-        if bbox:
-            im = im.crop(bbox)
-        w, h = im.size
-        s = max(w, h)
-        canvas = Image.new("L", (s, s), 255)
-        canvas.paste(im, ((s - w)//2, (s - h)//2))
-        canvas = canvas.resize((out_size, out_size), Image.BILINEAR)
-        # score by "ink coverage": prefer ~3-25% black pixels
-        ink_ratio = 1.0 - (np.array(canvas, dtype=np.uint8) / 255.0).mean()
-        score = 1.0 - abs(ink_ratio - 0.12)  # target ~12% black
-        cand.append((score, canvas))
+    # If crop is smaller than 224 (very small image), pad with white
+    if crop.size != (out_size, out_size):
+        canvas = Image.new("L", (out_size, out_size), 255)
+        cw, ch = crop.size
+        ox = (out_size - cw) // 2
+        oy = (out_size - ch) // 2
+        canvas.paste(crop, (ox, oy))
+        crop = canvas
 
-    # pick best-scoring candidate
-    cand.sort(key=lambda z: z[0], reverse=True)
-    return cand[0][1]
+    # 3. Increase contrast (make strokes darker)
+    crop = ImageEnhance.Contrast(crop).enhance(2.0)
+    crop = ImageEnhance.Brightness(crop).enhance(1.2)
+
+    # 4. Save preview if requested
+    if save_debug_path is not None:
+        crop.save(save_debug_path)
+
+    return crop
 
 # -------------------------- Dataset --------------------------
 
@@ -147,22 +155,22 @@ class SymbolsDataset(Dataset):
         # Transforms
         aug = transforms.RandomApply([
             transforms.RandomAffine(degrees=15, translate=(0.05, 0.05), shear=5)
-        ], p=0.9)
-        jitter = transforms.RandomApply([transforms.ColorJitter(0.15, 0.15)], p=0.5)
+        ], p=0.3)
         base = [
             transforms.Grayscale(1),
-            transforms.Resize((img_size, img_size)),
             transforms.ToTensor(),
             transforms.Normalize([0.5], [0.5]),
         ]
-        self.tfm = transforms.Compose(([aug, jitter] if train else []) + base)
+        self.tfm = transforms.Compose(([aug] if train else []) + base)
 
     def __len__(self): return len(self.samples)
 
     def __getitem__(self, idx):
         p, y = self.samples[idx]
-        pil = Image.open(p)
-        pil = preprocess_to_224_bw(pil, out_size=self.img_size)
+        with Image.open(p) as pil:
+            if pil.mode == "RGBA":
+                pil = pil.convert("RGB")
+            pil = preprocess_to_224_bw(pil, out_size=self.img_size)
         x = self.tfm(pil)
         return x, y
 
@@ -177,7 +185,7 @@ class SymbolsDataset(Dataset):
 class Encoder(nn.Module):
     def __init__(self, emb_dim=512):
         super().__init__()
-        m = resnet18(weights=None)
+        m = resnet18(weights=ResNet18_Weights.IMAGENET1K_V1)
         m.conv1 = nn.Conv2d(1, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.body = nn.Sequential(*list(m.children())[:-1])  # B,512,1,1
         self.proj = nn.Linear(512, emb_dim)
@@ -284,6 +292,22 @@ def cmd_train(args):
     print(classification_report(y_true, y_pred, target_names=classes, digits=4))
     print(confusion_matrix(y_true, y_pred))
 
+    def show_counts(tag, ds, classes):
+        cnt = Counter(y for _, y in ds.samples)
+        print(f"{tag} class counts:")
+        for i,c in enumerate(classes):
+            print(f"{c:>8}: {cnt.get(i,0)}")
+        print("Total", len(ds))
+
+    show_counts("TRAIN", train_ds, classes)
+    show_counts("TEST ", test_ds, classes)
+
+    missing = [c for i, c in enumerate(classes)
+               if not any(y == i for _, y in train_ds.samples)]
+    if missing:
+        raise RuntimeError(f"No training images for classes: {missing}. "
+                           "Fix your split or add aliases.")
+
 def cmd_expand(args):
     # Load existing
     ck, enc, head = load_ckpt(args.ckpt)
@@ -364,18 +388,16 @@ def predict_tensor(enc, head, x):
     return probs
 
 def tta_predict(pil_proc, tfm, device, enc, head, classes, img_size: int):
-    # Try multiple scales around 224 and small rotations; average probabilities.
-    scales = [200, 224, 248]
+    scales = [int(0.9*img_size), img_size, int(1.1*img_size)]
     angles = [-8, -4, 0, 4, 8]
     probs_sum = None
     for s in scales:
-        img_s = pil_proc.resize((s, s), Image.BILINEAR)
-        # re-pad to 224 so transforms downstream are stable
+        img_s = pil_proc.resize((s, s), RESAMPLE)
         canvas = Image.new("L", (img_size, img_size), 255)
-        off = (224 - s) // 2
+        off = (img_size - s) // 2
         canvas.paste(img_s, (off, off))
         for a in angles:
-            img_a = canvas.rotate(a, resample=Image.BILINEAR, fillcolor=255)
+            img_a = canvas.rotate(a, resample=RESAMPLE, fillcolor=255)
             x = tfm(img_a).unsqueeze(0).to(device)
             p = predict_tensor(enc, head, x)
             probs_sum = p if probs_sum is None else (probs_sum + p)
@@ -384,12 +406,14 @@ def tta_predict(pil_proc, tfm, device, enc, head, classes, img_size: int):
     return int(idx.item()), float(conf.item()), probs_mean.squeeze(0).cpu().numpy()
 
 def cmd_predict(args):
+    from pathlib import Path
+
     ck, enc, head = load_ckpt(args.ckpt)
     classes = ck["classes"]
     token_map = ck["token_map"]
     img_size = ck["img_size"]
 
-    # (Optional) allow MPS on Apple Silicon
+    # Allow MPS on Apple Silicon
     global DEVICE
     DEVICE = ("cuda" if torch.cuda.is_available()
               else ("mps" if torch.backends.mps.is_available() else "cpu"))
@@ -403,20 +427,31 @@ def cmd_predict(args):
     ])
 
     for p in args.images:
-        pil = Image.open(p)
-        # robust preprocess (uses Otsu/percentile, auto-invert if needed)
-        proc = preprocess_to_224_bw(pil, out_size=img_size)
+        p = Path(p)
 
+        with Image.open(p) as pil:
+            if pil.mode == "RGBA":
+                pil = pil.convert("RGB")
+
+            # --- Preprocess (fixed version you added earlier) ---
+            proc = preprocess_to_224_bw(pil, out_size=img_size)
+
+            # --- SAVE processed image to Desktop ---
+            save_path = Path.home() / f"Desktop/processed_{p.stem}.png"
+            proc.save(save_path)
+            print(f"[DEBUG] Saved processed image to: {save_path}")
+
+        # --- Run TTA prediction ---
         idx, conf, prob = tta_predict(proc, tfm, DEVICE, enc, head, classes, img_size)
         name = classes[idx]
         latex = token_map.get(name, name)
 
-        # Also show top-3 to debug near-ties
+        # top-3 classes
         top3 = np.argsort(prob)[-3:][::-1]
         top3_list = [(classes[i], float(prob[i])) for i in top3]
 
         print(json.dumps({
-            "path": p,
+            "path": str(p),
             "class": name,
             "latex": latex,
             "confidence": conf,
