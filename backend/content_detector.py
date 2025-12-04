@@ -2,7 +2,7 @@
 import cv2
 import numpy as np
 from pathlib import Path
-from image_preprocessing import preprocess_image
+from .image_preprocessing import preprocess_image
 
 DESKTOP = str(Path.home() / "Desktop")
 
@@ -130,7 +130,15 @@ def detect_matrix(gray):
     y1 = digit_y1 - 10
     y2 = digit_y2 + 10
 
-    return [("matrix", (x1, y1, x2, y2))]
+    PAD_X = 20   # tweak as needed (5–20 px ideal)
+    PAD_Y = 15
+
+    x1 = max(0, x1 - PAD_X)
+    y1 = max(0, y1 - PAD_Y)
+    x2 = min(gray.shape[1], x2 + PAD_X)
+    y2 = min(gray.shape[0], y2 + PAD_Y)
+
+    return [("matrix", (x1, y1, x2, y2), left_b, right_b)]
 
 
 # -----------------------------------------------------------

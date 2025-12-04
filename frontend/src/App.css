@@ -276,3 +276,10 @@
   max-width: 700px;
   margin: 16px auto 0;
 }
+
+.copy-button-disabled {
+  background: #d1d5db !important; /* gray */
+  color: #6b7280 !important;      /* darker gray text */
+  cursor: default;
+  pointer-events: none;
+}

@@ -9,6 +9,7 @@ function App() {
   const [isConverting, setIsConverting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [latexResult, setLatexResult] = useState("");
+  const [copied, setCopied] = useState(false)
 
   const fileInputRef = useRef(null);
 
@@ -23,6 +24,7 @@ function App() {
     setLatexResult("");
     const url = URL.createObjectURL(file);
     setPreviewUrl(url);
+    setCopied(false);
   };
 
   const handleFileChange = (e) => {
@@ -75,7 +77,7 @@ function App() {
     if (!latexResult) return;
     try {
       await navigator.clipboard.writeText(latexResult);
-      // optional: brief visual feedback
+      setCopied(true);
     } catch (err) {
       console.error("Copy failed:", err);
     }
@@ -161,10 +163,11 @@ function App() {
                     <span>LaTeX output</span>
                     <button
                         type="button"
-                        className="copy-button"
+                        className={`copy-button ${copied ? "copy-button-disabled" : ""}`}
                         onClick={handleCopy}
+                        disabled={copied}
                     >
-                      copy
+                      {copied ? "✔ copied" : "copy"}
                     </button>
                   </div>
                   <pre className="result-box">{latexResult}</pre>
