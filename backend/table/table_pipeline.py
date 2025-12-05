@@ -3,10 +3,13 @@
 import cv2
 import numpy as np
 
-from Texify.backend.handwriting_ocr import HandwritingOCR
+from .table_handwriting_ocr import TableOCR
 from Texify.backend.content_detector import detect_content
 from Texify.backend.table.table_segmenter import segment_table_cells
-from Texify.backend.table.table_to_latex import table_cells_to_latex
+from .table_to_latex import table_cells_to_latex
+from pathlib import Path
+
+DESKTOP = str(Path.home() / "Desktop")
 
 # ------------------------------
 # TEXT CLEANUP
@@ -68,17 +71,26 @@ def recognize_table(image_path):
         raise ValueError("Table segmentation failed")
 
     # 4. Load OCR
-    ocr = HandwritingOCR()
+    ocr = TableOCR()
 
     # 5. OCR each cell
     table_tokens = []
-    for row in cell_boxes:
+    for r, row in enumerate(cell_boxes):
         row_tokens = []
-        for (cx, cy, w, h) in row:
+        for c, (cx, cy, w, h) in enumerate(row):
+
             crop = table_crop[cy:cy + h, cx:cx + w]
 
             padded = pad_crop(crop, pad=16)
             trocr_input = prepare_for_trocr(padded)
+
+            # -------------------------------------------------
+            # NEW: Save raw image fed into OCR
+            # -------------------------------------------------
+            debug_path = f"{DESKTOP}/table_ocr_cell_{r}_{c}.png"
+            cv2.imwrite(debug_path, padded)
+            print(f"[DEBUG] Saved OCR crop → {debug_path}")
+            # -------------------------------------------------
 
             raw_text = ocr.recognize(trocr_input)
             cleaned = clean_cell_text(raw_text)

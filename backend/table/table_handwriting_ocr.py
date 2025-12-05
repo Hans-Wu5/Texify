@@ -1,19 +1,16 @@
-# table_ocr.py
+# table_handwriting_ocr.py
 
 import torch
 from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 import cv2
 
-
 class TableOCR:
     """
-    General OCR for table text.
-    Unlike matrix OCR, this keeps the FULL vocabulary.
-    Ideal for words, labels, headers, mixed content.
+    OCR for table cell text — uses a more general TrOCR model than matrix OCR.
     """
 
-    def __init__(self, model_name="microsoft/trocr-base-handwritten", device=None):
-        print(f"[INFO] Loading Table OCR model: {model_name}")
+    def __init__(self, model_name="microsoft/trocr-base-stage1", device=None):
+        print(f"[INFO] Loading TABLE OCR model: {model_name}")
 
         self.processor = TrOCRProcessor.from_pretrained(model_name)
         self.model = VisionEncoderDecoderModel.from_pretrained(model_name)
@@ -24,26 +21,17 @@ class TableOCR:
         self.model.to(device)
 
     def recognize(self, img):
-        """
-        BGR/GRAY → text string.
-        No digit restriction.
-        """
+        """Return full string (letters + digits) from crop."""
+        rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        # BGR/gray → RGB
-        if len(img.shape) == 2:
-            rgb = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-        else:
-            rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-        # Preprocess
         pixel_values = (
             self.processor(images=rgb, return_tensors="pt")
-            .pixel_values.to(self.device)
+            .pixel_values
+            .to(self.device)
         )
 
-        # Generate text
         with torch.no_grad():
-            ids = self.model.generate(pixel_values)
-            txt = self.processor.batch_decode(ids, skip_special_tokens=True)[0]
+            generated = self.model.generate(pixel_values)
 
-        return txt.strip()
+        text = self.processor.batch_decode(generated, skip_special_tokens=True)[0]
+        return text.strip()
