@@ -29,42 +29,61 @@ def detect_table(gray):
         15, 8
     )
 
-    horiz_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (40, 1))
+    horiz_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (50, 2))
+    vert_kernel  = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 50))
+
     horiz = cv2.morphologyEx(th, cv2.MORPH_OPEN, horiz_kernel)
+    vert  = cv2.morphologyEx(th, cv2.MORPH_OPEN, vert_kernel)
 
-    vert_kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 40))
-    vert = cv2.morphologyEx(th, cv2.MORPH_OPEN, vert_kernel)
+    # Find contours
+    h_contours, _ = cv2.findContours(horiz, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    v_contours, _ = cv2.findContours(vert,  cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
-    grid = cv2.add(horiz, vert)
-    save_debug("debug_table_grid", grid)
+    # Count long segments
+    long_h = [c for c in h_contours if cv2.boundingRect(c)[2] > 80]
+    long_v = [c for c in v_contours if cv2.boundingRect(c)[3] > 80]
 
-    contours, _ = cv2.findContours(grid, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    # ---- DEBUGGING PRINTS ----
+    print(f"Horizontal contours found: {len(h_contours)}")
+    print(f"Vertical contours found:   {len(v_contours)}")
+    print(f"Long H lines (>80px): {len(long_h)}")
+    for i, c in enumerate(long_h):
+        x,y,w,h = cv2.boundingRect(c)
+        print(f"   H[{i}] = (x={x}, y={y}, w={w}, h={h})")
 
-    boxes = []
-    for c in contours:
-        x, y, w, h = cv2.boundingRect(c)
-        if w > 50 and h > 50:
-            boxes.append((x, y, w, h))
+    print(f"Long V lines (>80px): {len(long_v)}")
+    for i, c in enumerate(long_v):
+        x,y,w,h = cv2.boundingRect(c)
+        print(f"   V[{i}] = (x={x}, y={y}, w={w}, h={h})")
 
-    if not boxes:
+    # ----------------------------------------
+    # NEW RULE: Table if H >= 2 AND V >= 2
+    # ----------------------------------------
+    if len(long_h) < 2 or len(long_v) < 2:
+        print("REJECT: Not enough long H/V lines → NOT a table.")
         return []
 
-    # largest table as usual
-    x, y, w, h = max(boxes, key=lambda b: b[2] * b[3])
+    print("ACCEPT: Enough horizontal & vertical lines → TABLE DETECTED.")
+
+    # Build combined bounding box
+    grid = cv2.add(horiz, vert)
+    contours, _ = cv2.findContours(grid, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    if not contours:
+        print("REJECT: No grid contour found.")
+        return []
+
+    x, y, w, h = cv2.boundingRect(max(contours, key=cv2.contourArea))
+
+    pad_w = int(w * 0.1)
+    pad_h = int(h * 0.1)
 
     H, W = gray.shape
-
-    # --- generous padding ---
-    pad_w = int(w * 0.1)   # 10% horizontally
-    pad_h = int(h * 0.1)   # 10% vertically
-
     x1 = max(0, x - pad_w)
     y1 = max(0, y - pad_h)
     x2 = min(W, x + w + pad_w)
     y2 = min(H, y + h + pad_h)
 
     return [("table", (x1, y1, x2, y2))]
-
 
 # -----------------------------------------------------------
 #  MATRIX DETECTOR (New – bracket + row grouping)
@@ -220,7 +239,17 @@ def visualize_detections(image_path, out="detections_preview.jpg"):
 
     COLORS = {"table": (0, 255, 0), "matrix": (255, 0, 0), "equation": (0, 128, 255)}
 
-    for label, (x1, y1, x2, y2) in detections:
+    for det in detections:
+        label = det[0]
+
+        # MATRIX → ("matrix", box, left_b, right_b)
+        if label == "matrix":
+            _, (x1, y1, x2, y2), left_b, right_b = det
+
+        # TABLE or EQUATION → ("table", box)
+        else:
+            _, (x1, y1, x2, y2) = det
+
         color = COLORS[label]
         cv2.rectangle(vis, (x1, y1), (x2, y2), color, 3)
         cv2.putText(vis, label, (x1, y1 - 10),

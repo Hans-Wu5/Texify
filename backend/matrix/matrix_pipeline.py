@@ -1,9 +1,10 @@
 # matrix_pipeline.py
 
 import cv2
+import numpy as np
+from Texify.backend.handwriting_ocr import HandwritingOCR
 from Texify.backend.content_detector import detect_content
 from .matrix_segmenter import segment_matrix_cells
-from Texify.backend.handwriting_ocr import HandwritingOCR
 from .matrix_to_latex import tokens_to_matrix_latex
 
 # ------------------------------
@@ -37,6 +38,28 @@ def collapse_columns(cell_tokens):
             collapsed.append(merged)
     return collapsed
 
+def pad_crop(img, pad=6):
+    """Expand crop by padding with white space."""
+    h, w = img.shape[:2]
+
+    # white background
+    if len(img.shape) == 2:
+        canvas = 255 * np.ones((h + pad*2, w + pad*2), dtype=img.dtype)
+        canvas[pad:pad+h, pad:pad+w] = img
+    else:
+        canvas = 255 * np.ones((h + pad*2, w + pad*2, 3), dtype=img.dtype)
+        canvas[pad:pad+h, pad:pad+w] = img
+
+    return canvas
+
+def prepare_for_trocr(crop):
+    # TROCR wants a roughly normalized 3-channel RGB image.
+    rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
+
+    # Slight contrast boost helps thin strokes like "1"
+    rgb = cv2.normalize(rgb, None, 0, 255, cv2.NORM_MINMAX)
+
+    return rgb
 
 def recognize_matrix(image_path):
     # 1. Detect content
@@ -72,13 +95,15 @@ def recognize_matrix(image_path):
             cx2 = cx1 + w
             cy2 = cy1 + h
 
-            rgb_crop = matrix_crop[cy1:cy2, cx1:cx2]
+            raw_crop = matrix_crop[cy1:cy2, cx1:cx2]
 
-            raw_txt = ocr.recognize(rgb_crop)
-            cleaned = clean_numeric_prediction(raw_txt)
-            final_txt = cleaned
+            # NEW: expand tight crops (especially fixes the “1 becomes 0” issue)
+            padded_crop = pad_crop(raw_crop, pad=20)
+            trocr_ready = prepare_for_trocr(padded_crop)
+            raw_txt = ocr.recognize_digit(trocr_ready)
+            cleaned = clean_numeric_prediction(raw_txt)  # keep only digits and dots
 
-            row_tokens.append(final_txt)
+            row_tokens.append(cleaned)
         cell_tokens.append(row_tokens)
 
     # 6. NEW — collapse extra columns

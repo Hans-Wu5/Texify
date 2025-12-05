@@ -2,35 +2,36 @@
 import cv2
 import numpy as np
 from sklearn.cluster import DBSCAN
+from pathlib import Path
 
-# ------------------------------------------------------------
-# Helper: check if a contour corresponds to a bracket
-# ------------------------------------------------------------
+DESKTOP = str(Path.home() / "Desktop")
+
 def is_bracket(x, y, w, h, left_b, right_b):
     lx, ly, lw, lh = left_b
     rx, ry, rw, rh = right_b
 
-    # left bracket similarity
     if abs(x - lx) < 25 and abs(h - lh) < 40:
         return True
-
-    # right bracket similarity
     if abs(x - rx) < 25 and abs(h - rh) < 40:
         return True
-
     return False
 
 
-# ------------------------------------------------------------
-# Segment matrix cells (rows × columns)
-# This version:
-#   • Ignores brackets entirely
-#   • Auto-detects ANY # of rows/columns
-#   • Uses Y-clustering for rows
-#   • Uses DBSCAN X-clustering for columns
-# ------------------------------------------------------------
+def visualize_cells(gray, final_matrix):
+    vis = cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR)
+
+    for r, row in enumerate(final_matrix):
+        for c, (x, y, w, h) in enumerate(row):
+            cv2.rectangle(vis, (x, y), (x + w, y + h), (0, 255, 0), 2)
+            cv2.putText(vis, f"{r},{c}", (x, y - 5),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)
+
+    out_path = f"{DESKTOP}/matrix_cells_debug.png"
+    cv2.imwrite(out_path, vis)
+    print(f"[DEBUG] Saved matrix visualization → {out_path}")
+
+
 def segment_matrix_cells(gray, left_b, right_b):
-    # --- 1. Threshold for symbol contours ---
     th = cv2.adaptiveThreshold(
         gray, 255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -42,72 +43,95 @@ def segment_matrix_cells(gray, left_b, right_b):
 
     digits = []
 
-    # --- 2. Filter contours (exclude brackets) ---
     for c in contours:
         x, y, w, h = cv2.boundingRect(c)
 
-        # ignore bracket contours
         if is_bracket(x, y, w, h, left_b, right_b):
             continue
 
-        # keep digit-like shapes
-        if 10 < w < 150 and 10 < h < 150:
+        if w > 2.5 * h:   # horizontal noise
+            continue
+
+        if h < 12 or w < 6:  # tiny noise
+            continue
+
+        if 3 < w < 150 and 10 < h < 150:
             digits.append((x, y, w, h))
 
     if len(digits) == 0:
         return []
 
-    # ------------------------------------------------------------
-    # 3. CLUSTER INTO ROWS (by Y-center)
-    # ------------------------------------------------------------
+    # -------- ROW CLUSTER ----------
     y_centers = np.array([d[1] + d[3] / 2 for d in digits]).reshape(-1, 1)
-
     row_clusterer = DBSCAN(eps=35, min_samples=1).fit(y_centers)
     row_labels = row_clusterer.labels_
 
-    # group by row label
     rows_dict = {}
     for lbl, d in zip(row_labels, digits):
         rows_dict.setdefault(lbl, []).append(d)
 
-    # sort rows top → bottom
     ordered_rows = [
         rows_dict[k]
         for k in sorted(rows_dict.keys(), key=lambda k: min([x[1] for x in rows_dict[k]]))
     ]
 
-    # ------------------------------------------------------------
-    # 4. WITHIN EACH ROW, CLUSTER INTO COLUMNS (by X-center)
-    # ------------------------------------------------------------
+    # -------- COL CLUSTER ----------
     final_matrix = []
 
     for row in ordered_rows:
         x_centers = np.array([d[0] + d[2] / 2 for d in row]).reshape(-1, 1)
-
-        col_clusterer = DBSCAN(eps=40, min_samples=1).fit(x_centers)
+        col_clusterer = DBSCAN(eps=50, min_samples=1).fit(x_centers)
         col_labels = col_clusterer.labels_
 
         cols_dict = {}
         for lbl, d in zip(col_labels, row):
             cols_dict.setdefault(lbl, []).append(d)
 
-        # Sort columns left → right
         ordered_cols = [
             cols_dict[k]
             for k in sorted(cols_dict.keys(), key=lambda k: min([x[0] for x in cols_dict[k]]))
         ]
 
-        # Extract single bounding box per cell
         row_cells = []
         for group in ordered_cols:
             x1 = min([g[0] for g in group])
             y1 = min([g[1] for g in group])
             x2 = max([g[0] + g[2] for g in group])
             y2 = max([g[1] + g[3] for g in group])
-            w = x2 - x1
-            h = y2 - y1
-            row_cells.append((x1, y1, w, h))
+            row_cells.append((x1, y1, x2 - x1, y2 - y1))
 
         final_matrix.append(row_cells)
 
+    # ============================================================
+    # PART 5 — GLOBAL FILTER
+    # ============================================================
+
+    # Step 1 — flatten all cells globally
+    all_cells = [cell for row in final_matrix for cell in row]
+
+    if not all_cells:
+        return final_matrix
+
+    # Step 2 — find largest GLOBAL area
+    global_largest = max([w*h for (_,_,w,h) in all_cells])
+
+    # Step 3 — compute global threshold
+    threshold = 0.10 * global_largest  # keep only ≥10% of largest
+
+    # Step 4 — filter per row using GLOBAL threshold
+    cleaned = []
+    for row in final_matrix:
+        filtered_row = [(x, y, w, h) for (x, y, w, h) in row if (w * h) >= threshold]
+
+        # <<< NEW: skip empty rows entirely
+        if len(filtered_row) == 0:
+            continue
+
+        cleaned.append(filtered_row)
+
+    final_matrix = cleaned
+
+    # ============================================================
+
+    visualize_cells(gray, final_matrix)
     return final_matrix

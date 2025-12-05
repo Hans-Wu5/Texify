@@ -6,3 +6,4 @@ scikit-learn
 numpy
 opencv-python
 ultralytics
+tensorflow
