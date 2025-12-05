@@ -2,7 +2,7 @@
 
 import cv2
 import numpy as np
-from Texify.backend.matrix.matrix_handwriting_ocr import MatrixOCR
+from .matrix_handwriting_ocr import MatrixOCR
 from Texify.backend.content_detector import detect_content
 from .matrix_segmenter import segment_matrix_cells
 from .matrix_to_latex import tokens_to_matrix_latex
@@ -16,7 +16,6 @@ def clean_numeric_prediction(txt):
     """Remove non-numeric characters from OCR output."""
     return "".join([c for c in txt if c in ALLOWED]).strip()
 
-
 def pad_crop(img, pad=6):
     """Expand crop by padding with white space."""
     h, w = img.shape[:2]
@@ -29,7 +28,6 @@ def pad_crop(img, pad=6):
         canvas[pad:pad+h, pad:pad+w] = img
 
     return canvas
-
 
 def prepare_for_trocr(crop):
     rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)

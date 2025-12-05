@@ -63,7 +63,7 @@ def segment_matrix_cells(gray, left_b, right_b):
 
     # -------- ROW CLUSTER ----------
     y_centers = np.array([d[1] + d[3] / 2 for d in digits]).reshape(-1, 1)
-    row_clusterer = DBSCAN(eps=40, min_samples=1).fit(y_centers)
+    row_clusterer = DBSCAN(eps=35, min_samples=1).fit(y_centers)
     row_labels = row_clusterer.labels_
 
     rows_dict = {}
@@ -80,7 +80,7 @@ def segment_matrix_cells(gray, left_b, right_b):
 
     for row in ordered_rows:
         x_centers = np.array([d[0] + d[2] / 2 for d in row]).reshape(-1, 1)
-        col_clusterer = DBSCAN(eps=45, min_samples=1).fit(x_centers)
+        col_clusterer = DBSCAN(eps=50, min_samples=1).fit(x_centers)
         col_labels = col_clusterer.labels_
 
         cols_dict = {}
