@@ -3,11 +3,8 @@
 import torch
 from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 import cv2
-import os
-import time
 
-
-class HandwritingOCR:
+class MatrixOCR:
     """
     Wrapper around microsoft/trocr-base-handwritten.
     Provides a simple .recognize(img) → string interface.
@@ -43,11 +40,6 @@ class HandwritingOCR:
         # -------------------------------------------
         # DEBUG: Save what TrOCR actually sees
         # -------------------------------------------
-        debug_path = os.path.expanduser(
-            f"~/Desktop/trocr_debug_{int(time.time()*1000)}.png"
-        )
-        cv2.imwrite(debug_path, rgb)
-        print(f"[DEBUG] Saved TrOCR input → {debug_path}")
 
         pixel_values = (
             self.processor(images=rgb, return_tensors="pt")
@@ -77,11 +69,6 @@ class HandwritingOCR:
         # -------------------------------------------
         # DEBUG: Save digit crop given to TrOCR
         # -------------------------------------------
-        debug_path = os.path.expanduser(
-            f"~/Desktop/trocr_debug_digit_{int(time.time()*1000)}.png"
-        )
-        cv2.imwrite(debug_path, rgb)
-        print(f"[DEBUG] Saved TrOCR digit input → {debug_path}")
 
         # Encode image
         pixel_values = (
@@ -95,15 +82,16 @@ class HandwritingOCR:
         digit_tokens = [str(i) for i in range(10)]
         digit_ids = tokenizer.convert_tokens_to_ids(digit_tokens)
 
+        eos_id = tokenizer.eos_token_id
+
         # Build suppression list: all vocab except digit IDs
         all_ids = set(range(len(tokenizer)))
-        suppress = list(all_ids - set(digit_ids))
+        suppress = list(all_ids - set(digit_ids + [eos_id]))
 
         # Run constrained generation
         generated = self.model.generate(
             pixel_values,
-            suppress_tokens=suppress,
-            max_length = 3
+            suppress_tokens=suppress
         )
 
         text = tokenizer.decode(generated[0], skip_special_tokens=True)

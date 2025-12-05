@@ -1,6 +1,5 @@
 # content_detector.py
 import cv2
-import numpy as np
 from pathlib import Path
 from .image_preprocessing import preprocess_image
 
