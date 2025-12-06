@@ -16,10 +16,11 @@ def visualize_cells(gray, cells):
             cv2.rectangle(vis, (x, y), (x + w, y + h), (0, 150, 255), 2)
             cv2.putText(vis, f"{r},{c}", (x + 3, y + 15),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 150, 255), 1)
-
+    '''
     out_path = f"{DESKTOP}/table_cells_debug.png"
     cv2.imwrite(out_path, vis)
     print("[DEBUG] Saved:", out_path)
+    '''
 
 
 # -----------------------------------------------------
@@ -42,7 +43,6 @@ def collapse(lines, min_gap=10):
 
     groups.append(current)
     return [int(np.mean(g)) for g in groups]
-
 
 # -----------------------------------------------------
 # Extract clean table cell boxes
@@ -106,8 +106,10 @@ def segment_table_cells(gray):
 
         h_lines = mask
 
+    '''
     cv2.imwrite(f"{DESKTOP}/debug_h_lines_filtered.png", h_lines)
     print("[DEBUG] Saved filtered horizontal lines")
+    '''
 
     # --------------------------------------------------------------
     # 3. VERTICAL LINES (strong)
@@ -138,8 +140,10 @@ def segment_table_cells(gray):
 
         v_lines = mask
 
+    '''
     cv2.imwrite(f"{DESKTOP}/debug_v_lines_filtered.png", v_lines)
     print("[DEBUG] Saved filtered vertical lines")
+    '''
 
     # --------------------------------------------------------------
     # 4. EXTRACT GRID COORDINATES

@@ -68,9 +68,11 @@ def recognize_table(image_path):
             # -------------------------------------------------
             # NEW: Save raw image fed into OCR
             # -------------------------------------------------
+            '''
             debug_path = f"{DESKTOP}/table_ocr_cell_{r}_{c}.png"
             cv2.imwrite(debug_path, crop)
             print(f"[DEBUG] Saved OCR crop → {debug_path}")
+            '''
             # -------------------------------------------------
 
             raw_text = ocr.recognize(trocr_input)

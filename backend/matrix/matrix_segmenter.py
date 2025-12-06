@@ -26,10 +26,11 @@ def visualize_cells(gray, final_matrix):
             cv2.putText(vis, f"{r},{c}", (x, y - 5),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0,255,0), 2)
 
+    '''
     out_path = f"{DESKTOP}/matrix_cells_debug.png"
     cv2.imwrite(out_path, vis)
     print(f"[DEBUG] Saved matrix visualization → {out_path}")
-
+    '''
 
 def segment_matrix_cells(gray, left_b, right_b):
     th = cv2.adaptiveThreshold(

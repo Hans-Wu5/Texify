@@ -37,10 +37,6 @@ class MatrixOCR:
         else:
             rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-        # -------------------------------------------
-        # DEBUG: Save what TrOCR actually sees
-        # -------------------------------------------
-
         pixel_values = (
             self.processor(images=rgb, return_tensors="pt")
             .pixel_values
@@ -65,10 +61,6 @@ class MatrixOCR:
             rgb = cv2.cvtColor(image, cv2.COLOR_GRAY2RGB)
         else:
             rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-
-        # -------------------------------------------
-        # DEBUG: Save digit crop given to TrOCR
-        # -------------------------------------------
 
         # Encode image
         pixel_values = (
