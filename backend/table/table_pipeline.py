@@ -4,8 +4,8 @@ import cv2
 import numpy as np
 
 from .table_handwriting_ocr import TableOCR
-from Texify.backend.content_detector import detect_content
-from Texify.backend.table.table_segmenter import segment_table_cells
+from ..content_detector import detect_content
+from ..table.table_segmenter import segment_table_cells
 from .table_to_latex import table_cells_to_latex
 from pathlib import Path
 
@@ -21,23 +21,6 @@ ALLOWED = set("0123456789abcdefghijklmnopqrstuvwxyz"
 def clean_cell_text(txt):
     """Remove garbage characters from OCR output."""
     return "".join([c for c in txt if c in ALLOWED]).strip()
-
-
-# ------------------------------
-# PAD AND NORMALIZE CROP
-# ------------------------------
-def pad_crop(img, pad=12):
-    """Expand crop by padding with white background."""
-    h, w = img.shape[:2]
-
-    if len(img.shape) == 2:
-        canvas = 255 * np.ones((h + pad * 2, w + pad * 2), dtype=np.uint8)
-        canvas[pad:pad + h, pad:pad + w] = img
-    else:
-        canvas = 255 * np.ones((h + pad * 2, w + pad * 2, 3), dtype=np.uint8)
-        canvas[pad:pad + h, pad:pad + w] = img
-
-    return canvas
 
 
 def prepare_for_trocr(crop):
@@ -80,15 +63,13 @@ def recognize_table(image_path):
         for c, (cx, cy, w, h) in enumerate(row):
 
             crop = table_crop[cy:cy + h, cx:cx + w]
-
-            padded = pad_crop(crop, pad=16)
-            trocr_input = prepare_for_trocr(padded)
+            trocr_input = prepare_for_trocr(crop)
 
             # -------------------------------------------------
             # NEW: Save raw image fed into OCR
             # -------------------------------------------------
             debug_path = f"{DESKTOP}/table_ocr_cell_{r}_{c}.png"
-            cv2.imwrite(debug_path, padded)
+            cv2.imwrite(debug_path, crop)
             print(f"[DEBUG] Saved OCR crop → {debug_path}")
             # -------------------------------------------------
 

@@ -3,7 +3,7 @@
 import cv2
 import numpy as np
 from .matrix_handwriting_ocr import MatrixOCR
-from Texify.backend.content_detector import detect_content
+from ..content_detector import detect_content
 from .matrix_segmenter import segment_matrix_cells
 from .matrix_to_latex import tokens_to_matrix_latex
 
