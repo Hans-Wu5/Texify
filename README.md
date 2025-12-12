@@ -7,7 +7,7 @@
 Texify is a web application that converts **handwritten mathematical content** (equations, symbols, matrices, and tables) into **clean, editable LaTeX**. Users can upload an image (or capture via webcam), and Texify classifies the content type and routes it to a specialized pipeline to generate LaTeX.
 
 <p align="center">
-  <img src="assets/demo.png" width="400">
+  <img width="543" height="317" alt="frontend" src="https://github.com/user-attachments/assets/df43bf5d-d2ec-4a78-b715-4c95231db08e" />
 </p>
 
 ---
