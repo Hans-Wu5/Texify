@@ -5,7 +5,6 @@
 - Shukai Yin — sky1122@seas.upenn.edu  
 
 Texify is a web application that converts **handwritten mathematical content** (equations, symbols, matrices, and tables) into **clean, editable LaTeX**. Users can upload an image (or capture via webcam), and Texify classifies the content type and routes it to a specialized pipeline to generate LaTeX.
-
 ---
 
 ## Demo and Slide:
