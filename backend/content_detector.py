@@ -94,7 +94,7 @@ def detect_matrix(gray):
         cv2.THRESH_BINARY_INV,
         11, 3
     )
-    save_debug("debug_matrix_thresh", th)
+    # save_debug("debug_matrix_thresh", th)
 
     contours, _ = cv2.findContours(th, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
@@ -178,7 +178,7 @@ def detect_equation(gray):
     kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (9, 9))
     closed = cv2.morphologyEx(th, cv2.MORPH_CLOSE, kernel)
 
-    save_debug("debug_equation_closed", closed)
+    # save_debug("debug_equation_closed", closed)
 
     # --- 4) Extract external blobs ---
     contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -209,7 +209,7 @@ def detect_equation(gray):
 # -----------------------------------------------------------
 def detect_content(image_path):
     orig, gray = preprocess_image(image_path)
-    save_debug("debug_preprocessed", gray)
+    # save_debug("debug_preprocessed", gray)
 
     table_boxes = detect_table(gray)
     matrix_boxes = detect_matrix(gray)

@@ -6,6 +6,7 @@ import shutil
 
 from .table.table_pipeline import recognize_table
 from .matrix.matrix_pipeline import recognize_matrix
+from .equation.equation_pipeline import recognize_equation
 from .content_detector import detect_content
 
 app = FastAPI()
@@ -49,6 +50,9 @@ async def convert_image(file: UploadFile = File(...)):
     elif label == "matrix":
         print(">>> Running recognize_matrix()")
         latex = recognize_matrix(tmp_path)
+    elif label == "equation":
+        print(">>> Running recognize_equation()")
+        latex = recognize_equation(tmp_path)
     else:
         latex = "ERROR: Unknown content type"
 

@@ -10,3 +10,4 @@ tensorflow
 easyocr
 fastapi
 uvicorn
+pix2tex

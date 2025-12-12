@@ -16,11 +16,11 @@ def visualize_cells(gray, cells):
             cv2.rectangle(vis, (x, y), (x + w, y + h), (0, 150, 255), 2)
             cv2.putText(vis, f"{r},{c}", (x + 3, y + 15),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 150, 255), 1)
-    '''
+
     out_path = f"{DESKTOP}/table_cells_debug.png"
     cv2.imwrite(out_path, vis)
     print("[DEBUG] Saved:", out_path)
-    '''
+
 
 
 # -----------------------------------------------------
