@@ -9,7 +9,9 @@ Texify is a web application that converts **handwritten mathematical content** (
 ---
 
 ## Demo and Slide:
+
 Demo link: https://drive.google.com/file/d/1nYpaHobpuuL1_3z64d4SMCeMJ2N2boxa/view?ts=6937298c
+
 Slide link: https://docs.google.com/presentation/d/1URXz4-tzmIVa1k-878TLaK2HCRNMQ8wQBcXWF796sh0/edit?slide=id.g3adf36c0e09_0_0#slide=id.g3adf36c0e09_0_0
 
 ---
@@ -40,6 +42,9 @@ Slide link: https://docs.google.com/presentation/d/1URXz4-tzmIVa1k-878TLaK2HCRNM
 ---
 
 ## Data and Model
+
 hasyv2: https://www.kaggle.com/datasets/guru001/hasyv2
+
 CROHME: https://drive.google.com/uc?id=13vjxGYrFCuYnwgDIUqkxsNGKk__D_sOM
+
 Pix2Tex: https://github.com/lukas-blecher/LaTeX-OCR/tree/main
